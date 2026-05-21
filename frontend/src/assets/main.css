@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0f172a;
+  color: #cbd5e1;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+/* Markdown content inside bubbles */
+.bubble h1, .bubble h2, .bubble h3 { margin: 12px 0 6px; }
+.bubble p { margin-bottom: 8px; }
+.bubble code {
+  background: #0f172a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
+}
+.bubble pre {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.bubble pre code { background: transparent; padding: 0; }
+.bubble table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.bubble th, .bubble td { border: 1px solid #334155; padding: 8px 12px; }
+.bubble th { background: #1e293b; }
