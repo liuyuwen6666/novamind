@@ -1,35 +1,80 @@
 version: "3.9"
 
+# ============================================================
+# NovaMind - AI RAG SaaS
+# 启动命令: docker compose up -d
+# 访问地址: http://服务器IP:3000
+# ============================================================
+
 services:
+  # ── PostgreSQL + pgvector ────────────────────────────────
   postgres:
     image: pgvector/pgvector:pg16
     container_name: novamind_postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: novamind
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-novamind123}
+      POSTGRES_DB: ${POSTGRES_DB:-novamind}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - novamind_net
 
+  # ── FastAPI Backend ──────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: novamind_backend
+    restart: unless-stopped
     env_file:
-      - ./backend/.env
+      - .env
+    environment:
+      # 覆盖数据库连接（使用 Docker 内部网络主机名）
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-novamind123}@postgres:5432/${POSTGRES_DB:-novamind}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - novamind_net
+    volumes:
+      # 持久化上传文件
+      - ./uploads:/app/uploads
 
+  # ── Vue3 Frontend ────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # 构建时注入后端地址（用于生产环境）
+        # 服务器部署时改为: http://服务器IP:8000
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    container_name: novamind_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    networks:
+      - novamind_net
+
+# ── Volumes ──────────────────────────────────────────────
 volumes:
   pgdata:
+    driver: local
+
+# ── Networks ─────────────────────────────────────────────
+networks:
+  novamind_net:
+    driver: bridge

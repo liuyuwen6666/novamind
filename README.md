@@ -74,3 +74,11 @@ docker-compose up -d
 
 python -m uvicorn app.main:app --reload
 
+```
+git clone https://github.com/liuyuwen6666/novamind.git
+cd novamind
+cp .env.example .env
+# 编辑 .env 改 VITE_API_BASE_URL=http://你的服务器IP:8000
+docker compose up -d
+
+```

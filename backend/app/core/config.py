@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+import os
 
 
 class Settings(BaseSettings):
@@ -15,10 +16,17 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # ── CORS ─────────────────────────────────────────────
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    # Docker 部署时自动包含前端容器地址
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ]
 
     # ── Database ─────────────────────────────────────────
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/novamind"
+    # Docker Compose 时会被 environment 覆盖为 postgres:5432
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:novamind123@postgres:5432/novamind"
 
     # ── AI / LLM ─────────────────────────────────────────
     LLM_API_KEY: str = ""
@@ -46,5 +54,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
-# Trigger final reload with verified settings

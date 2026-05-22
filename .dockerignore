@@ -1,0 +1,54 @@
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+dist/
+.eggs/
+*.so
+
+# ── Virtual env ───────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── Node / Frontend ───────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# ── Build outputs ─────────────────────────────────────────
+dist/
+build/
+*.egg
+
+# ── Environment files ─────────────────────────────────────
+.env
+backend/.env
+!.env.example
+!backend/.env.example
+
+# ── Uploads / Data ────────────────────────────────────────
+uploads/
+*.pdf
+*.docx
+*.xlsx
+
+# ── IDE ───────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Docker ───────────────────────────────────────────────
+.dockerignore
