@@ -42,9 +42,19 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     system_prompt = build_rag_system_prompt(context) if context else NO_CONTEXT_SYSTEM_PROMPT
     system_msg = ChatMessage(role="system", content=system_prompt)
 
-    # 使用前端传来的完整对话历史，不叠加服务器端全局 Memory
-    # 这样 use_rag 切换时，历史消息不会污染当前模式
-    messages = [system_msg] + list(request.messages)
+    # 使用前端传来的完整对话历史，限制最大消息数防止 token 溢出
+    # 保留最近 MAX_MEMORY_MESSAGES 条，确保 user/assistant 成对（偶数）
+    from app.core.config import get_settings
+    _settings = get_settings()
+    history = list(request.messages)
+    max_msgs = _settings.MAX_MEMORY_MESSAGES  # 默认 20
+    if len(history) > max_msgs:
+        # 从尾部截取，保证 user/assistant 成对
+        history = history[-max_msgs:]
+        # 确保第一条是 user（不能以 assistant 开头）
+        while history and history[0].role != "user":
+            history = history[1:]
+    messages = [system_msg] + history
 
     llm = LLMService()
 
