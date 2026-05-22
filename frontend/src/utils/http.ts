@@ -1,10 +1,10 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 const http = axios.create({
-  baseURL: `${API_BASE_URL}/v1`,
+  baseURL: `${API_BASE_URL}/api/v1`,
   timeout: 30000,
 })
 

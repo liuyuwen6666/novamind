@@ -1,5 +1,8 @@
 import type { ChatRequest } from '@/types'
 
+// 与 http.ts 保持一致，使用同一个 baseURL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+
 /**
  * 发起 SSE 流式 Chat 请求
  * @param request 请求参数
@@ -13,7 +16,7 @@ export async function streamChat(
   onToolCall: (name: string, result: unknown) => void,
   onDone: () => void,
 ): Promise<void> {
-  const response = await fetch('/api/v1/chat/', {
+  const response = await fetch(`${API_BASE_URL}/api/v1/chat/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),

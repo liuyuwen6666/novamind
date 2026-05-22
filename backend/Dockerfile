@@ -35,6 +35,7 @@ EXPOSE 8000
 
 # 启动脚本（先等待 DB，再启动服务）
 COPY start.sh /start.sh
-RUN chmod +x /start.sh
+# 修复 Windows CRLF 换行符，确保脚本在 Linux 容器中可执行
+RUN sed -i 's/\r$//' /start.sh && chmod +x /start.sh
 
 CMD ["/start.sh"]
