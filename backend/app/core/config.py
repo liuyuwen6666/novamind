@@ -44,8 +44,8 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 100
     RAG_TOP_K: int = 5
 
-    # ── Tool: Weather ────────────────────────────────────
-    WEATHER_API_KEY: str = ""
+    # ── Tool: 百度地图（天气 + 经纬度） ──────────────────
+    BAIDU_MAP_AK: str = ""
 
     # ── Memory ───────────────────────────────────────────
     MAX_MEMORY_MESSAGES: int = 20

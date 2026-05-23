@@ -103,6 +103,8 @@ async def session_chat(body: SessionChatRequest, db: AsyncSession = Depends(get_
 
     async def stream_generator():
         nonlocal full_content
+        accumulated_tools: dict[int, dict] = {}
+
         try:
             async for chunk_str in llm.chat(messages, stream=True, tools=tool_registry.list_tools()):
                 try:
@@ -112,16 +114,52 @@ async def session_chat(body: SessionChatRequest, db: AsyncSession = Depends(get_
                     if content:
                         full_content += content
                         yield f"data: {json.dumps({'content': content})}\n\n"
+
+                    # 累积 tool_calls
                     tool_calls = delta.get("tool_calls")
                     if tool_calls:
                         for tc in tool_calls:
+                            idx = tc.get("index", 0)
                             fn = tc.get("function", {})
-                            tool_name = fn.get("name")
-                            tool_args = json.loads(fn.get("arguments", "{}"))
+                            if idx not in accumulated_tools:
+                                accumulated_tools[idx] = {"id": tc.get("id"), "name": "", "arguments": ""}
+                            if tc.get("id"):
+                                accumulated_tools[idx]["id"] = tc["id"]
+                            if fn.get("name"):
+                                accumulated_tools[idx]["name"] = fn["name"]
+                            if fn.get("arguments"):
+                                accumulated_tools[idx]["arguments"] += fn["arguments"]
+
+                    finish_reason = data.get("choices", [{}])[0].get("finish_reason")
+                    if finish_reason == "tool_calls" and accumulated_tools:
+                        for idx in sorted(accumulated_tools.keys()):
+                            tc_info = accumulated_tools[idx]
+                            tool_name = tc_info["name"]
+                            try:
+                                tool_args = json.loads(tc_info["arguments"] or "{}")
+                            except json.JSONDecodeError:
+                                tool_args = {}
                             result = await tool_registry.execute(tool_name, **tool_args)
                             yield f"data: {json.dumps({'tool_call': tool_name, 'result': result})}\n\n"
+                        accumulated_tools.clear()
+
                 except Exception:
                     pass
+
+            # 流结束兜底执行
+            if accumulated_tools:
+                for idx in sorted(accumulated_tools.keys()):
+                    tc_info = accumulated_tools[idx]
+                    tool_name = tc_info["name"]
+                    if not tool_name:
+                        continue
+                    try:
+                        tool_args = json.loads(tc_info["arguments"] or "{}")
+                    except json.JSONDecodeError:
+                        tool_args = {}
+                    result = await tool_registry.execute(tool_name, **tool_args)
+                    yield f"data: {json.dumps({'tool_call': tool_name, 'result': result})}\n\n"
+
         except Exception as e:
             logger.error("Stream error: %s", e)
             yield f"data: {json.dumps({'content': f'\\n\\n**请求异常**：{str(e)}'})}\n\n"

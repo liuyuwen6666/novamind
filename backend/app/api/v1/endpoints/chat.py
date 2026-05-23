@@ -14,12 +14,14 @@ from app.services.embedding_service import EmbeddingService
 from app.services.llm_service import LLMService
 from app.tools.registry import tool_registry
 from app.tools.weather_tool import WeatherTool
+from app.tools.geocode_tool import GeocodeQueryTool
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 # 注册 Tools
 tool_registry.register(WeatherTool())
+tool_registry.register(GeocodeQueryTool())
 
 
 @router.post("/", summary="AI 对话（支持 RAG + Tool Calling + Streaming）")
@@ -60,27 +62,70 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
 
     async def stream_generator():
         full_content = ""
+        # tool_calls 累积字典: index → {id, name, arguments_str}
+        accumulated_tools: dict[int, dict] = {}
+
         try:
             async for chunk_str in llm.chat(messages, stream=True, tools=tool_registry.list_tools()):
                 try:
                     data = json.loads(chunk_str)
                     delta = data.get("choices", [{}])[0].get("delta", {})
+
+                    # 普通文本内容
                     content = delta.get("content", "")
                     if content:
                         full_content += content
                         yield f"data: {json.dumps({'content': content})}\n\n"
-                    # Tool Call 处理
+
+                    # 累积 tool_calls（LLM 会把 name 和 arguments 分散在多个 chunk）
                     tool_calls = delta.get("tool_calls")
                     if tool_calls:
                         for tc in tool_calls:
+                            idx = tc.get("index", 0)
                             fn = tc.get("function", {})
-                            tool_name = fn.get("name")
-                            tool_args = json.loads(fn.get("arguments", "{}"))
+                            if idx not in accumulated_tools:
+                                accumulated_tools[idx] = {"id": tc.get("id"), "name": "", "arguments": ""}
+                            if tc.get("id"):
+                                accumulated_tools[idx]["id"] = tc["id"]
+                            if fn.get("name"):
+                                accumulated_tools[idx]["name"] = fn["name"]
+                            if fn.get("arguments"):
+                                accumulated_tools[idx]["arguments"] += fn["arguments"]
+
+                    # 检查是否流式结束（finish_reason）
+                    finish_reason = data.get("choices", [{}])[0].get("finish_reason")
+                    if finish_reason == "tool_calls" and accumulated_tools:
+                        # 执行所有累积完成的工具调用
+                        for idx in sorted(accumulated_tools.keys()):
+                            tc_info = accumulated_tools[idx]
+                            tool_name = tc_info["name"]
+                            try:
+                                tool_args = json.loads(tc_info["arguments"] or "{}")
+                            except json.JSONDecodeError:
+                                tool_args = {}
                             logger.info("Tool call: %s %s", tool_name, tool_args)
                             result = await tool_registry.execute(tool_name, **tool_args)
                             yield f"data: {json.dumps({'tool_call': tool_name, 'result': result})}\n\n"
+                        accumulated_tools.clear()
+
                 except Exception:
                     pass
+
+            # 流结束时若仍有未执行的 tool_calls（部分模型不返回 finish_reason）
+            if accumulated_tools:
+                for idx in sorted(accumulated_tools.keys()):
+                    tc_info = accumulated_tools[idx]
+                    tool_name = tc_info["name"]
+                    if not tool_name:
+                        continue
+                    try:
+                        tool_args = json.loads(tc_info["arguments"] or "{}")
+                    except json.JSONDecodeError:
+                        tool_args = {}
+                    logger.info("Tool call (fallback): %s %s", tool_name, tool_args)
+                    result = await tool_registry.execute(tool_name, **tool_args)
+                    yield f"data: {json.dumps({'tool_call': tool_name, 'result': result})}\n\n"
+
         except Exception as e:
             logger.error("Stream error: %s", e)
             yield f"data: {json.dumps({'content': f'\\n\\n**AI 请求异常**：{str(e)}'})}\n\n"
@@ -88,3 +133,4 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
