@@ -16,7 +16,7 @@ from app.tools.registry import BaseTool
 logger = get_logger(__name__)
 settings = get_settings()
 
-_DISTRICT_FILE = Path(__file__).parent.parent.parent / "weather_district_id.txt"
+_DISTRICT_FILE = Path(__file__).parent.parent.parent / "data" / "weather_district_id.csv"
 
 
 @lru_cache(maxsize=1)
@@ -117,12 +117,18 @@ class GeocodeQueryTool(BaseTool):
         local = _find_local_geocode(city)
         if local:
             logger.info("本地匹配经纬度成功: city=%s, lon=%s, lat=%s", city, local["longitude"], local["latitude"])
-            return local
+            return {
+                "status": "success",
+                "data": local
+            }
 
         # 回退到百度地图 Geocoding API
-        ak = settings.BAIDU_MAP_AK
+        ak = settings.WEATHER_API_KEY or settings.BAIDU_MAP_AK
         if not ak:
-            return {"error": "未找到城市经纬度，且百度地图 AK 未配置，请检查 .env 中的 BAIDU_MAP_AK"}
+            return {
+                "status": "error",
+                "message": "未找到城市经纬度，且百度地图 AK 未配置，请检查 .env 中的 WEATHER_API_KEY"
+            }
 
         logger.info("本地未匹配，调用百度 Geocoding API: city=%s", city)
         try:
@@ -139,19 +145,34 @@ class GeocodeQueryTool(BaseTool):
                 data = resp.json()
 
             if data.get("status") != 0:
-                return {"error": f"百度 Geocoding API 返回错误: {data.get('msg', '未知错误')}"}
+                return {
+                    "status": "error",
+                    "message": f"百度 Geocoding API 返回错误: {data.get('msg', '未知错误')}"
+                }
 
             loc = data["result"]["location"]
             return {
-                "city": city,
-                "longitude": loc["lng"],
-                "latitude": loc["lat"],
-                "source": "baidu_geocoding",
+                "status": "success",
+                "data": {
+                    "city": city,
+                    "province": None,
+                    "city_name": None,
+                    "district": None,
+                    "longitude": loc["lng"],
+                    "latitude": loc["lat"],
+                    "source": "baidu_geocoding",
+                }
             }
 
         except httpx.HTTPError as e:
             logger.error("GeocodeQueryTool HTTP error: %s", e)
-            return {"error": f"网络请求失败: {str(e)}"}
+            return {
+                "status": "error",
+                "message": f"网络请求失败: {str(e)}"
+            }
         except Exception as e:
             logger.error("GeocodeQueryTool error: %s", e)
-            return {"error": str(e)}
+            return {
+                "status": "error",
+                "message": str(e)
+            }

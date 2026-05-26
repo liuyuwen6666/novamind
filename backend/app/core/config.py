@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     RAG_TOP_K: int = 5
 
     # ── Tool: 百度地图（天气 + 经纬度） ──────────────────
+    WEATHER_API_KEY: str = ""
     BAIDU_MAP_AK: str = ""
 
     # ── Memory ───────────────────────────────────────────

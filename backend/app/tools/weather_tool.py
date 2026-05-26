@@ -17,9 +17,9 @@ from app.tools.registry import BaseTool
 logger = get_logger(__name__)
 settings = get_settings()
 
-# weather_district_id.txt 放在 backend 目录下（COPY . . 会一起打包进容器 /app/）
-# 容器内路径: /app/weather_district_id.txt  →  __file__=/app/app/tools/weather_tool.py → parent*3
-_DISTRICT_FILE = Path(__file__).parent.parent.parent / "weather_district_id.txt"
+# data/weather_district_id.csv 放在 backend/data 目录下（COPY . . 会一起打包进容器 /app/data/）
+# 容器内路径: /app/data/weather_district_id.csv  →  __file__=/app/app/tools/weather_tool.py → parent*3
+_DISTRICT_FILE = Path(__file__).parent.parent.parent / "data" / "weather_district_id.csv"
 
 
 @lru_cache(maxsize=1)
@@ -98,14 +98,20 @@ class WeatherTool(BaseTool):
         # Step 1: 查 district_id
         district_id = _find_district_id(city)
         if not district_id:
-            return {"error": f"未找到城市 '{city}' 对应的区域 ID，请尝试更精确的城市名称"}
+            return {
+                "status": "error",
+                "message": f"未找到城市 '{city}' 对应的区域 ID，请尝试更精确的城市名称"
+            }
 
         logger.info("city=%s → district_id=%s", city, district_id)
 
         # Step 2: 调百度天气 API
-        ak = settings.BAIDU_MAP_AK
+        ak = settings.WEATHER_API_KEY or settings.BAIDU_MAP_AK
         if not ak:
-            return {"error": "百度地图 AK 未配置，请在 .env 中设置 BAIDU_MAP_AK"}
+            return {
+                "status": "error",
+                "message": "百度地图 AK 未配置，请在 .env 中设置 WEATHER_API_KEY"
+            }
 
         try:
             async with httpx.AsyncClient(timeout=15) as client:
@@ -121,7 +127,10 @@ class WeatherTool(BaseTool):
                 data = resp.json()
 
             if data.get("status") != 0:
-                return {"error": f"百度天气 API 返回错误: {data.get('message', '未知错误')}"}
+                return {
+                    "status": "error",
+                    "message": f"百度天气 API 返回错误: {data.get('message', '未知错误')}"
+                }
 
             result = data.get("result", {})
             location = result.get("location", {})
@@ -138,6 +147,10 @@ class WeatherTool(BaseTool):
                     "city": location.get("city"),
                     "district": location.get("name"),
                 },
+                "now": None,
+                "forecasts": [],
+                "alerts": [],
+                "life_indexes": []
             }
 
             if now:
@@ -189,11 +202,20 @@ class WeatherTool(BaseTool):
                     for idx in indexes
                 ]
 
-            return output
+            return {
+                "status": "success",
+                "data": output
+            }
 
         except httpx.HTTPError as e:
             logger.error("WeatherTool HTTP error: %s", e)
-            return {"error": f"网络请求失败: {str(e)}"}
+            return {
+                "status": "error",
+                "message": f"网络请求失败: {str(e)}"
+            }
         except Exception as e:
             logger.error("WeatherTool error: %s", e)
-            return {"error": str(e)}
+            return {
+                "status": "error",
+                "message": str(e)
+            }

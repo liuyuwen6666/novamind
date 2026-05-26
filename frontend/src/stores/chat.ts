@@ -3,12 +3,24 @@ import { ref, computed } from 'vue'
 import { sessionApi } from '@/api/session'
 import type { Session, Message } from '@/api/session'
 
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  // 兼容非安全上下文（HTTP）或旧版浏览器的降级方案
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 // ── visitor_id 管理（localStorage 持久化）──────────────────────
 function getOrCreateVisitorId(): string {
   const key = 'novamind_visitor_id'
   let id = localStorage.getItem(key)
   if (!id) {
-    id = crypto.randomUUID()
+    id = generateUUID()
     localStorage.setItem(key, id)
   }
   return id
@@ -76,7 +88,7 @@ export const useChatStore = defineStore('chat', () => {
   // ── 追加本地消息（流式结束后调用）────────────────────────────
   function addLocalMessage(role: 'user' | 'assistant', content: string) {
     const fake: Message = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       session_id: currentSessionId.value!,
       role,
       content,
