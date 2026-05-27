@@ -753,5 +753,46 @@ async function sendMessage() {
   color: #64748b;
   font-size: 11px;
 }
+
+/* ── 消息气泡内工具折叠卡片美化 ── */
+.bubble :deep(details) {
+  background: #0b1329;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 10px 0;
+  transition: all 0.25s ease;
+}
+
+.bubble :deep(details[open]) {
+  border-color: #38bdf8;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.08);
+}
+
+.bubble :deep(summary) {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #38bdf8;
+  outline: none;
+  user-select: none;
+}
+
+.bubble :deep(summary::-webkit-details-marker) {
+  color: #38bdf8;
+}
+
+.bubble :deep(details[open] summary) {
+  margin-bottom: 10px;
+  border-bottom: 1px solid #1e293b;
+  padding-bottom: 6px;
+}
+
+/* 确保折叠内部的代码块看起来更整洁 */
+.bubble :deep(details pre) {
+  margin: 0 !important;
+  background: #050b18 !important;
+}
 </style>
+
 
