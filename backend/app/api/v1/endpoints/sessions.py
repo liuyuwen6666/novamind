@@ -86,12 +86,22 @@ async def session_chat(body: SessionChatRequest, db: AsyncSession = Depends(get_
 
     # 4. RAG 检索
     context = ""
+    sources_data = []
     if body.use_rag:
         doc_repo = DocumentRepository(db)
         retriever = RAGRetriever(doc_repo, EmbeddingService())
         chunks = await retriever.retrieve(body.message, workspace_id=body.workspace_id)
         if chunks:
             context = retriever.build_context(chunks)
+            sources_data = [
+                {
+                    "file_name": c.file_name or "未知文档",
+                    "chunk_index": c.chunk_index,
+                    "score": round(c.score, 4) if c.score is not None else 0.0
+                }
+                for c in chunks
+            ]
+
 
     # 5. 构建 system prompt
     system_prompt = build_rag_system_prompt(context) if context else NO_CONTEXT_SYSTEM_PROMPT
@@ -325,10 +335,32 @@ async def session_chat(body: SessionChatRequest, db: AsyncSession = Depends(get_
             full_content += error_msg
             yield f"data: {json.dumps({'content': error_msg})}\n\n"
 
+        # 过滤 sources_data，只保留在 full_content 中出现过角标 [i] 的 chunks
+        final_sources = []
+        if sources_data and full_content:
+            import re
+            ref_indices = [int(x) for x in re.findall(r"\[([1-9][0-9]*)\]", full_content)]
+            ref_indices = sorted(list(set(ref_indices)))
+            for idx in ref_indices:
+                list_idx = idx - 1
+                if 0 <= list_idx < len(sources_data):
+                    final_sources.append(sources_data[list_idx])
+
+        # 降级兜底：如果模型由于偶发原因没有使用角标，但开启了 RAG，我们默认取最相关的 top 2 来源展现给用户，避免全部展现干扰视线
+        if not final_sources and sources_data:
+            final_sources = sources_data[:2]
+
         # 6. 保存 AI 回复 + 更新 updated_at
         if full_content:
-            await repo.add_message(body.session_id, role="assistant", content=full_content)
+            await repo.add_message(body.session_id, role="assistant", content=full_content, sources=final_sources)
+
         await repo.touch_session(body.session_id)
+
+        if final_sources:
+            yield f"data: {json.dumps({'sources': final_sources})}\n\n"
+
         yield "data: [DONE]\n\n"
 
+
     return StreamingResponse(stream_generator(), media_type="text/event-stream")
+

@@ -68,6 +68,7 @@ class MessageOut(BaseModel):
     role: str
     content: str
     created_at: datetime
+    sources: Optional[list[dict]] = None
 
     model_config = {"from_attributes": True}
 
@@ -87,3 +88,5 @@ class ChunkOut(BaseModel):
     chunk_index: int
     content: str
     score: float | None = None
+    file_name: Optional[str] = None
+

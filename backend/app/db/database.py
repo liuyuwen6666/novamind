@@ -34,3 +34,6 @@ async def init_db() -> None:
         # 先启用 pgvector 扩展，否则 vector 类型不存在
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
+        # 兼容旧表，自动添加 sources 字段
+        await conn.execute(text("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS sources JSONB"))
+

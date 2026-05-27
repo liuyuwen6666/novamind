@@ -66,8 +66,26 @@
                       <span></span>
                     </div>
                   </template>
-                  <div v-else class="markdown-body" v-html="renderMarkdown(msg.content || '')" />
+                  <template v-else>
+                    <div class="markdown-body" v-html="renderMarkdown(msg.content || '')" />
+                    
+                    <!-- 引用来源卡片 -->
+                    <div v-if="msg.sources && msg.sources.length > 0" class="message-sources">
+                      <div class="sources-title">来源：</div>
+                      <ul class="sources-list">
+                        <li v-for="(source, sIdx) in msg.sources" :key="sIdx" class="source-item">
+                          - <span class="source-file">{{ source.file_name }}</span>
+                          <span class="source-divider">/</span>
+                          <span class="source-chunk">chunk {{ source.chunk_index }}</span>
+                          <span class="source-score" :title="`匹配度得分: ${source.score}`">
+                            (Score: {{ source.score.toFixed(2) }})
+                          </span>
+                        </li>
+                      </ul>
+                    </div>
+                  </template>
                 </div>
+
                 <!-- 消息内容下方的辅助工具栏（复制全文） -->
                 <div v-if="msg.role === 'assistant' && msg.content" class="message-actions">
                   <el-button
@@ -280,8 +298,15 @@ async function sendMessage() {
         store.touchSession(store.currentSessionId!)
         await scrollToBottom()
       },
+      (sources) => {
+        const last = store.messages[store.messages.length - 1]
+        if (last?.role === 'assistant') {
+          last.sources = sources
+        }
+      }
     )
-  } catch (e) {
+  }
+ catch (e) {
     store.isStreaming = false
     store.streamContent = ''
     
@@ -675,4 +700,58 @@ async function sendMessage() {
 .bubble :deep(tr:nth-child(even)) {
   background: #111b27;
 }
+
+/* ── 知识库引用来源卡片样式 ── */
+.message-sources {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: #0b1329;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+}
+
+.sources-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.sources-list {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.source-item {
+  font-size: 13px;
+  color: #cbd5e1;
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+
+.source-item:last-child {
+  margin-bottom: 0;
+}
+
+.source-file {
+  font-weight: 500;
+  color: #38bdf8;
+}
+
+.source-divider {
+  margin: 0 4px;
+  color: #475569;
+}
+
+.source-chunk {
+  color: #a78bfa;
+}
+
+.source-score {
+  margin-left: 6px;
+  color: #64748b;
+  font-size: 11px;
+}
 </style>
+

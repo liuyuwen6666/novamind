@@ -9,13 +9,21 @@ export interface Session {
   updated_at: string
 }
 
+export interface MessageSource {
+  file_name: string
+  chunk_index: number
+  score: number
+}
+
 export interface Message {
   id: string
   session_id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   created_at: string
+  sources?: MessageSource[]
 }
+
 
 export const sessionApi = {
   /** 创建新会话 */

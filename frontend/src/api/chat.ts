@@ -8,6 +8,7 @@ export async function streamChat(
   onChunk: (content: string) => void,
   onToolCall: (name: string, result: unknown) => void,
   onDone: () => void,
+  onSources?: (sources: any[]) => void,
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/v1/chat/`, {
     method: 'POST',
@@ -19,7 +20,7 @@ export async function streamChat(
     throw new Error(`Chat 请求失败: ${response.status}`)
   }
 
-  await _readSSE(response.body, onChunk, onToolCall, onDone)
+  await _readSSE(response.body, onChunk, onToolCall, onDone, onSources)
 }
 
 /** 新接口：基于 session 的流式对话 */
@@ -34,6 +35,7 @@ export async function streamSessionChat(
   onChunk: (content: string) => void,
   onToolCall: (name: string, result: unknown) => void,
   onDone: () => void,
+  onSources?: (sources: any[]) => void,
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/v1/chat/sessions/chat`, {
     method: 'POST',
@@ -46,7 +48,7 @@ export async function streamSessionChat(
     throw new Error(`Chat 请求失败: ${response.status} ${err}`)
   }
 
-  await _readSSE(response.body, onChunk, onToolCall, onDone)
+  await _readSSE(response.body, onChunk, onToolCall, onDone, onSources)
 }
 
 /** SSE 流读取公共逻辑 */
@@ -55,6 +57,7 @@ async function _readSSE(
   onChunk: (content: string) => void,
   onToolCall: (name: string, result: unknown) => void,
   onDone: () => void,
+  onSources?: (sources: any[]) => void,
 ): Promise<void> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
@@ -79,6 +82,7 @@ async function _readSSE(
         const data = JSON.parse(payload)
         if (data.content) onChunk(data.content)
         if (data.tool_call) onToolCall(data.tool_call, data.result)
+        if (data.sources && onSources) onSources(data.sources)
       } catch {
         // ignore
       }

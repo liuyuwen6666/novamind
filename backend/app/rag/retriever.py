@@ -19,11 +19,19 @@ class RAGRetriever:
         query_embedding = await self.embedding_svc.embed_query(query)
         results = await self.doc_repo.similarity_search(query_embedding, top_k=top_k, workspace_id=workspace_id)
         chunks = [
-            ChunkOut(id=chunk.id, chunk_index=chunk.chunk_index, content=chunk.content, score=score)
+            ChunkOut(
+                id=chunk.id,
+                chunk_index=chunk.chunk_index,
+                content=chunk.content,
+                score=score,
+                file_name=chunk.file.file_name if (hasattr(chunk, "file") and chunk.file) else None
+            )
             for chunk, score in results
         ]
         logger.info("RAG retrieved %d chunks for query: %.50s", len(chunks), query)
         return chunks
 
+
     def build_context(self, chunks: list[ChunkOut]) -> str:
-        return "\n\n".join(f"[{i+1}] {c.content}" for i, c in enumerate(chunks))
+        return "\n\n".join(f"【文档片段 {i+1}】(来源: {c.file_name if c.file_name else '未知'}):\n{c.content}" for i, c in enumerate(chunks))
+

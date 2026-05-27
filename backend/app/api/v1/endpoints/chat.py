@@ -30,6 +30,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
 
     # RAG 检索（仅当 use_rag=True 时执行）
     context = ""
+    sources_data = []
     if request.use_rag:
         doc_repo = DocumentRepository(db)
         embedding_svc = EmbeddingService()
@@ -37,8 +38,17 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         chunks = await retriever.retrieve(user_message.content, workspace_id=request.workspace_id)
         if chunks:
             context = retriever.build_context(chunks)
+            sources_data = [
+                {
+                    "file_name": c.file_name or "未知文档",
+                    "chunk_index": c.chunk_index,
+                    "score": round(c.score, 4) if c.score is not None else 0.0
+                }
+                for c in chunks
+            ]
 
     # 构建 System Prompt
+
     # use_rag=True 且有检索结果 → RAG prompt（注入知识库上下文）
     # use_rag=False 或无检索结果 → 纯 AI prompt（明确禁止使用文档内容）
     system_prompt = build_rag_system_prompt(context) if context else NO_CONTEXT_SYSTEM_PROMPT
@@ -276,6 +286,27 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
             logger.error("Stream error: %s", e)
             yield f"data: {json.dumps({'content': f'\n\n❌ **AI 请求异常**：{str(e)}'})}\n\n"
 
+        # 过滤 sources_data，只保留在 assistant_content 中出现过角标 [i] 的 chunks
+        final_sources = []
+        if sources_data and assistant_content:
+            import re
+            ref_indices = [int(x) for x in re.findall(r"\[([1-9][0-9]*)\]", assistant_content)]
+            ref_indices = sorted(list(set(ref_indices)))
+            for idx in ref_indices:
+                list_idx = idx - 1
+                if 0 <= list_idx < len(sources_data):
+                    final_sources.append(sources_data[list_idx])
+
+        # 降级兜底：如果模型由于偶发原因没有使用角标，但开启了 RAG，我们默认取最相关的 top 2 来源展现给用户，避免全部展现干扰视线
+        if not final_sources and sources_data:
+            final_sources = sources_data[:2]
+
+        if final_sources:
+            yield f"data: {json.dumps({'sources': final_sources})}\n\n"
+
+
         yield "data: [DONE]\n\n"
 
+
     return StreamingResponse(stream_generator(), media_type="text/event-stream")
+

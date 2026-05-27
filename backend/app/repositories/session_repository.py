@@ -47,12 +47,13 @@ class SessionRepository:
 
     # ── Messages ─────────────────────────────────────────────────
 
-    async def add_message(self, session_id: uuid.UUID, role: str, content: str) -> ChatMessage:
-        msg = ChatMessage(session_id=session_id, role=role, content=content)
+    async def add_message(self, session_id: uuid.UUID, role: str, content: str, sources: list[dict] | None = None) -> ChatMessage:
+        msg = ChatMessage(session_id=session_id, role=role, content=content, sources=sources)
         self.db.add(msg)
         await self.db.commit()
         await self.db.refresh(msg)
         return msg
+
 
     async def get_messages(self, session_id: uuid.UUID) -> list[ChatMessage]:
         """获取会话所有消息，正序"""

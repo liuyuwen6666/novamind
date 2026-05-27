@@ -85,6 +85,8 @@ class ChatMessage(Base):
     role: Mapped[str] = mapped_column(String(16), nullable=False)  # user | assistant | system
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    sources: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
 
     session: Mapped["ChatSession"] = relationship("ChatSession", back_populates="messages")
+
 
