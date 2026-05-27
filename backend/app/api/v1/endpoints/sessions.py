@@ -150,10 +150,46 @@ async def session_chat(body: SessionChatRequest, db: AsyncSession = Depends(get_
                                 tool_args = {}
                             logger.info("Tool call: %s %s", tool_name, tool_args)
 
-                            # 通知前端正在调用工具
-                            yield f"data: {json.dumps({'type': 'tool_start', 'tool': tool_name})}\n\n"
+                            # 构造并流式输出正在调用工具的 Markdown
+                            tool_desc = ""
+                            tool_obj = tool_registry.get(tool_name)
+                            if tool_obj:
+                                tool_desc = getattr(tool_obj, "description", "")
+                            args_str = json.dumps(tool_args, ensure_ascii=False)
+                            
+                            start_md = f"\n\n> 🔧 **正在调用系统工具**：`{tool_name}`"
+                            if tool_desc:
+                                start_md += f" ({tool_desc})"
+                            start_md += "\n"
+                            if tool_args:
+                                start_md += f"> 📥 **输入参数**：`{args_str}`\n"
+                            
+                            assistant_content += start_md
+                            full_content += start_md
+                            yield f"data: {json.dumps({'content': start_md})}\n\n"
 
-                            result = await tool_registry.execute(tool_name, **tool_args)
+                            try:
+                                result = await tool_registry.execute(tool_name, **tool_args)
+                                result_json_str = (
+                                    json.dumps(result, ensure_ascii=False, indent=2)
+                                    if not isinstance(result, (str, int, float, bool))
+                                    else str(result)
+                                )
+                                formatted_result = "\n".join(f"> {line}" for line in result_json_str.split("\n"))
+                                result_md = (
+                                    f"> 📤 **工具返回结果**：\n"
+                                    f"> ```json\n"
+                                    f"{formatted_result}\n"
+                                    f"> ```\n\n"
+                                )
+                            except Exception as te:
+                                result = f"Error: {str(te)}"
+                                result_md = f"> ❌ **工具执行失败**：`{str(te)}`\n\n"
+
+                            assistant_content += result_md
+                            full_content += result_md
+                            yield f"data: {json.dumps({'content': result_md})}\n\n"
+
                             tool_results.append({
                                 "tool_id": tool_id,
                                 "tool_name": tool_name,
@@ -165,7 +201,7 @@ async def session_chat(body: SessionChatRequest, db: AsyncSession = Depends(get_
                         # ── 第二轮：将工具结果注入对话，让 LLM 生成自然语言回答 ──
                         second_round_messages = list(messages)
 
-                        # 追加 assistant 消息（占位，保持对话连续性）
+                        # 追加 assistant 消息（占位，保持对话连续性与历史一致）
                         second_round_messages.append(
                             ChatMessage(role="assistant", content=assistant_content or "")
                         )
@@ -211,8 +247,46 @@ async def session_chat(body: SessionChatRequest, db: AsyncSession = Depends(get_
                         tool_args = {}
                     logger.info("Tool call (fallback): %s %s", tool_name, tool_args)
 
-                    yield f"data: {json.dumps({'type': 'tool_start', 'tool': tool_name})}\n\n"
-                    result = await tool_registry.execute(tool_name, **tool_args)
+                    # 构造并流式输出正在调用工具的 Markdown
+                    tool_desc = ""
+                    tool_obj = tool_registry.get(tool_name)
+                    if tool_obj:
+                        tool_desc = getattr(tool_obj, "description", "")
+                    args_str = json.dumps(tool_args, ensure_ascii=False)
+                    
+                    start_md = f"\n\n> 🔧 **正在调用系统工具**：`{tool_name}`"
+                    if tool_desc:
+                        start_md += f" ({tool_desc})"
+                    start_md += "\n"
+                    if tool_args:
+                        start_md += f"> 📥 **输入参数**：`{args_str}`\n"
+                    
+                    assistant_content += start_md
+                    full_content += start_md
+                    yield f"data: {json.dumps({'content': start_md})}\n\n"
+
+                    try:
+                        result = await tool_registry.execute(tool_name, **tool_args)
+                        result_json_str = (
+                            json.dumps(result, ensure_ascii=False, indent=2)
+                            if not isinstance(result, (str, int, float, bool))
+                            else str(result)
+                        )
+                        formatted_result = "\n".join(f"> {line}" for line in result_json_str.split("\n"))
+                        result_md = (
+                            f"> 📤 **工具返回结果**：\n"
+                            f"> ```json\n"
+                            f"{formatted_result}\n"
+                            f"> ```\n\n"
+                        )
+                    except Exception as te:
+                        result = f"Error: {str(te)}"
+                        result_md = f"> ❌ **工具执行失败**：`{str(te)}`\n\n"
+
+                    assistant_content += result_md
+                    full_content += result_md
+                    yield f"data: {json.dumps({'content': result_md})}\n\n"
+
                     tool_results.append({
                         "tool_id": tool_id,
                         "tool_name": tool_name,
@@ -247,7 +321,7 @@ async def session_chat(body: SessionChatRequest, db: AsyncSession = Depends(get_
 
         except Exception as e:
             logger.error("Stream error: %s", e)
-            error_msg = f"\n\n**请求异常**：{str(e)}"
+            error_msg = f"\n\n❌ **请求异常**：{str(e)}"
             full_content += error_msg
             yield f"data: {json.dumps({'content': error_msg})}\n\n"
 
