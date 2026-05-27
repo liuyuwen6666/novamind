@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -27,6 +28,14 @@ class FileListItem(BaseModel):
 class ChatMessage(BaseModel):
     role: str = Field(..., pattern="^(user|assistant|system|tool)$")
     content: str
+    tool_call_id: Optional[str] = None  # role=tool 时必填（OpenAI Tool Calling 规范）
+
+    def to_api_dict(self) -> dict:
+        """序列化为 LLM API 消息格式，None 字段自动过滤"""
+        d = {"role": self.role, "content": self.content}
+        if self.tool_call_id is not None:
+            d["tool_call_id"] = self.tool_call_id
+        return d
 
 
 class ChatRequest(BaseModel):

@@ -30,7 +30,7 @@ class LLMService:
     ) -> AsyncIterator[str]:
         payload: dict = {
             "model": self.model,
-            "messages": [m.model_dump() for m in messages],
+            "messages": [m.to_api_dict() for m in messages],
             "stream": stream,
         }
         if tools:

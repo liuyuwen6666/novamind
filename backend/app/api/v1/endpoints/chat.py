@@ -61,9 +61,9 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     llm = LLMService()
 
     async def stream_generator():
-        full_content = ""
-        # tool_calls 累积字典: index → {id, name, arguments_str}
+        # ── 第一轮：让 LLM 决定是否调用工具 ──────────────────────────
         accumulated_tools: dict[int, dict] = {}
+        assistant_content = ""
 
         try:
             async for chunk_str in llm.chat(messages, stream=True, tools=tool_registry.list_tools()):
@@ -71,10 +71,10 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
                     data = json.loads(chunk_str)
                     delta = data.get("choices", [{}])[0].get("delta", {})
 
-                    # 普通文本内容
+                    # 普通文本内容（非工具调用时直接流给前端）
                     content = delta.get("content", "")
                     if content:
-                        full_content += content
+                        assistant_content += content
                         yield f"data: {json.dumps({'content': content})}\n\n"
 
                     # 累积 tool_calls（LLM 会把 name 和 arguments 分散在多个 chunk）
@@ -92,30 +92,73 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
                             if fn.get("arguments"):
                                 accumulated_tools[idx]["arguments"] += fn["arguments"]
 
-                    # 检查是否流式结束（finish_reason）
+                    # 检查 finish_reason
                     finish_reason = data.get("choices", [{}])[0].get("finish_reason")
                     if finish_reason == "tool_calls" and accumulated_tools:
-                        # 执行所有累积完成的工具调用
+                        # ── 执行所有工具，收集结果 ──────────────────────
+                        tool_results = []
                         for idx in sorted(accumulated_tools.keys()):
                             tc_info = accumulated_tools[idx]
                             tool_name = tc_info["name"]
+                            tool_id = tc_info["id"] or f"call_{idx}"
                             try:
                                 tool_args = json.loads(tc_info["arguments"] or "{}")
                             except json.JSONDecodeError:
                                 tool_args = {}
                             logger.info("Tool call: %s %s", tool_name, tool_args)
+
+                            # 通知前端正在调用工具（进度提示，可选）
+                            yield f"data: {json.dumps({'type': 'tool_start', 'tool': tool_name})}\n\n"
+
                             result = await tool_registry.execute(tool_name, **tool_args)
-                            yield f"data: {json.dumps({'tool_call': tool_name, 'result': result})}\n\n"
+                            tool_results.append({
+                                "tool_id": tool_id,
+                                "tool_name": tool_name,
+                                "result": result,
+                            })
+
                         accumulated_tools.clear()
+
+                        # ── 第二轮：将工具结果注入对话，让 LLM 生成自然语言回答 ──
+                        second_round_messages = list(messages)
+
+                        # 追加 assistant 消息（占位，保持对话连续性）
+                        second_round_messages.append(
+                            ChatMessage(role="assistant", content=assistant_content or "")
+                        )
+
+                        # 追加每个工具的结果消息（role=tool）
+                        for tr in tool_results:
+                            result_str = (
+                                json.dumps(tr["result"], ensure_ascii=False)
+                                if not isinstance(tr["result"], str)
+                                else tr["result"]
+                            )
+                            second_round_messages.append(
+                                ChatMessage(role="tool", content=result_str, tool_call_id=tr["tool_id"])
+                            )
+
+                        # 第二轮流式输出 LLM 自然语言回答给前端
+                        async for chunk_str2 in llm.chat(second_round_messages, stream=True, tools=None):
+                            try:
+                                data2 = json.loads(chunk_str2)
+                                delta2 = data2.get("choices", [{}])[0].get("delta", {})
+                                content2 = delta2.get("content", "")
+                                if content2:
+                                    yield f"data: {json.dumps({'content': content2})}\n\n"
+                            except Exception:
+                                pass
 
                 except Exception:
                     pass
 
-            # 流结束时若仍有未执行的 tool_calls（部分模型不返回 finish_reason）
+            # 流结束后若仍有未处理的 tool_calls（部分模型不返回 finish_reason）
             if accumulated_tools:
+                tool_results = []
                 for idx in sorted(accumulated_tools.keys()):
                     tc_info = accumulated_tools[idx]
                     tool_name = tc_info["name"]
+                    tool_id = tc_info["id"] or f"call_{idx}"
                     if not tool_name:
                         continue
                     try:
@@ -123,14 +166,44 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
                     except json.JSONDecodeError:
                         tool_args = {}
                     logger.info("Tool call (fallback): %s %s", tool_name, tool_args)
+
+                    yield f"data: {json.dumps({'type': 'tool_start', 'tool': tool_name})}\n\n"
                     result = await tool_registry.execute(tool_name, **tool_args)
-                    yield f"data: {json.dumps({'tool_call': tool_name, 'result': result})}\n\n"
+                    tool_results.append({
+                        "tool_id": tool_id,
+                        "tool_name": tool_name,
+                        "result": result,
+                    })
+
+                if tool_results:
+                    second_round_messages = list(messages)
+                    second_round_messages.append(
+                        ChatMessage(role="assistant", content=assistant_content or "")
+                    )
+                    for tr in tool_results:
+                        result_str = (
+                            json.dumps(tr["result"], ensure_ascii=False)
+                            if not isinstance(tr["result"], str)
+                            else tr["result"]
+                        )
+                        second_round_messages.append(
+                            ChatMessage(role="tool", content=result_str, tool_call_id=tr["tool_id"])
+                        )
+
+                    async for chunk_str2 in llm.chat(second_round_messages, stream=True, tools=None):
+                        try:
+                            data2 = json.loads(chunk_str2)
+                            delta2 = data2.get("choices", [{}])[0].get("delta", {})
+                            content2 = delta2.get("content", "")
+                            if content2:
+                                yield f"data: {json.dumps({'content': content2})}\n\n"
+                        except Exception:
+                            pass
 
         except Exception as e:
             logger.error("Stream error: %s", e)
-            yield f"data: {json.dumps({'content': f'\\n\\n**AI 请求异常**：{str(e)}'})}\n\n"
+            yield f"data: {json.dumps({'content': f'\\n\\n**AI 请求异常**：{str(e)}'})}\\n\\n"
 
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(stream_generator(), media_type="text/event-stream")
-
