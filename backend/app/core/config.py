@@ -1,6 +1,28 @@
+from enum import Enum
+from typing import Optional
+from urllib.parse import urlparse
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
-import os
+
+
+class LLMProvider(str, Enum):
+    """支持的 LLM 提供商"""
+    OPENAI_COMPATIBLE = "openai-compatible"
+    TENCENT_HUNYUAN = "tencent-hunyuan"
+    LONGCAT = "longcat"
+
+
+def detect_provider(base_url: str) -> LLMProvider:
+    """根据 base_url 自动检测 LLM 提供商"""
+    if not base_url:
+        return LLMProvider.OPENAI_COMPATIBLE
+    host = urlparse(base_url).hostname or ""
+    if "longcat" in host:
+        return LLMProvider.LONGCAT
+    if "tencentmaas" in host or "tencent" in host:
+        return LLMProvider.TENCENT_HUNYUAN
+    return LLMProvider.OPENAI_COMPATIBLE
 
 
 class Settings(BaseSettings):
@@ -31,7 +53,9 @@ class Settings(BaseSettings):
     # ── AI / LLM ─────────────────────────────────────────
     LLM_API_KEY: str = ""
     LLM_BASE_URL: str = ""
-    LLM_MODEL: str = "longcat"
+    LLM_MODEL: str = "gpt-3.5-turbo"
+    # 可选，不设置则从 LLM_BASE_URL 自动检测
+    LLM_PROVIDER: Optional[str] = None
 
     # ── Embedding ────────────────────────────────────────
     EMBEDDING_API_KEY: str = ""
@@ -50,6 +74,20 @@ class Settings(BaseSettings):
 
     # ── Memory ───────────────────────────────────────────
     MAX_MEMORY_MESSAGES: int = 20
+
+    @property
+    def provider(self) -> LLMProvider:
+        if self.LLM_PROVIDER:
+            return LLMProvider(self.LLM_PROVIDER)
+        return detect_provider(self.LLM_BASE_URL)
+
+    @property
+    def supports_tool_calling(self) -> bool:
+        return self.provider in (LLMProvider.OPENAI_COMPATIBLE, LLMProvider.LONGCAT)
+
+    @property
+    def supports_streaming(self) -> bool:
+        return True
 
 
 @lru_cache

@@ -5,13 +5,7 @@
       <aside class="session-sidebar">
         <div class="sidebar-header">
           <span class="sidebar-title">历史会话</span>
-          <el-button
-            type="primary"
-            size="small"
-            :icon="Plus"
-            @click="handleNewSession"
-            :loading="store.loading"
-          >
+          <el-button type="primary" size="small" :icon="Plus" @click="handleNewSession" :loading="store.loading">
             新建
           </el-button>
         </div>
@@ -20,13 +14,8 @@
           <div v-if="store.sessions.length === 0" class="session-empty">
             暂无会话，点击"新建"开始
           </div>
-          <div
-            v-for="session in store.sessions"
-            :key="session.id"
-            class="session-item"
-            :class="{ active: session.id === store.currentSessionId }"
-            @click="handleSwitchSession(session.id)"
-          >
+          <div v-for="session in store.sessions" :key="session.id" class="session-item"
+            :class="{ active: session.id === store.currentSessionId }" @click="handleSwitchSession(session.id)">
             <span class="session-icon">💬</span>
             <span class="session-title">{{ session.title }}</span>
           </div>
@@ -51,15 +40,11 @@
               <p>向 NovaMind 提问，探索企业知识库</p>
             </div>
 
-            <div
-              v-for="(msg, idx) in store.messages"
-              :key="idx"
-              class="message-item"
-              :class="msg.role"
-            >
+            <div v-for="(msg, idx) in store.messages" :key="idx" class="message-item" :class="msg.role">
               <div class="message-content-wrapper">
                 <div class="bubble">
-                  <template v-if="msg.role === 'assistant' && !msg.content && store.isStreaming && idx === store.messages.length - 1">
+                  <template
+                    v-if="msg.role === 'assistant' && !msg.content && store.isStreaming && idx === store.messages.length - 1">
                     <div class="typing-indicator">
                       <span></span>
                       <span></span>
@@ -68,7 +53,7 @@
                   </template>
                   <template v-else>
                     <div class="markdown-body" v-html="renderMarkdown(msg.content || '')" />
-                    
+
                     <!-- 引用来源卡片 -->
                     <div v-if="msg.sources && msg.sources.length > 0" class="message-sources">
                       <div class="sources-title">来源：</div>
@@ -88,14 +73,8 @@
 
                 <!-- 消息内容下方的辅助工具栏（复制全文） -->
                 <div v-if="msg.role === 'assistant' && msg.content" class="message-actions">
-                  <el-button
-                    link
-                    size="small"
-                    :icon="DocumentCopy"
-                    class="copy-msg-btn"
-                    title="复制全文"
-                    @click="copyText(msg.content)"
-                  >
+                  <el-button link size="small" :icon="DocumentCopy" class="copy-msg-btn" title="复制全文"
+                    @click="copyText(msg.content)">
                     复制全文
                   </el-button>
                 </div>
@@ -109,21 +88,10 @@
               <el-switch v-model="useRag" active-text="RAG 知识库" inactive-text="纯 AI" />
             </div>
             <div class="input-row">
-              <el-input
-                v-model="inputText"
-                type="textarea"
-                :autosize="{ minRows: 1, maxRows: 4 }"
-                placeholder="输入问题，按 Enter 发送，Shift+Enter 换行"
-                @keydown.enter.exact.prevent="sendMessage"
-                class="chat-input"
-                :disabled="store.isStreaming"
-              />
-              <el-button
-                type="primary"
-                :loading="store.isStreaming"
-                @click="sendMessage"
-                class="send-btn"
-              >
+              <el-input v-model="inputText" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
+                placeholder="输入问题，按 Enter 发送，Shift+Enter 换行" @keydown.enter.exact.prevent="sendMessage"
+                class="chat-input" :disabled="store.isStreaming" />
+              <el-button type="primary" :loading="store.isStreaming" @click="sendMessage" class="send-btn">
                 发送
               </el-button>
             </div>
@@ -173,7 +141,7 @@ marked.use({
 
 const store = useChatStore()
 const inputText = ref('')
-const useRag = ref(true)
+const useRag = ref(false)
 const msgListRef = ref<HTMLElement>()
 
 function renderMarkdown(content: string): string {
@@ -207,13 +175,13 @@ onMounted(async () => {
   }
 
   // 注册全局代码复制方法
-  ;(window as any).copyCode = async (btn: HTMLButtonElement) => {
+  ; (window as any).copyCode = async (btn: HTMLButtonElement) => {
     const wrapper = btn.closest('.code-block-wrapper')
     if (!wrapper) return
     const codeEl = wrapper.querySelector('code')
     if (!codeEl) return
     const codeText = codeEl.textContent || ''
-    
+
     try {
       await navigator.clipboard.writeText(codeText)
       btn.innerHTML = `
@@ -291,7 +259,7 @@ async function sendMessage() {
         if (last?.role === 'assistant') last.content += chunk
         await scrollToBottom()
       },
-      (_name, _result) => {},
+      (_name, _result) => { },
       async () => {
         store.isStreaming = false
         store.streamContent = ''
@@ -306,16 +274,16 @@ async function sendMessage() {
       }
     )
   }
- catch (e) {
+  catch (e) {
     store.isStreaming = false
     store.streamContent = ''
-    
+
     // 捕获异常，并对空占位消息填补错误展示
     const last = store.messages[store.messages.length - 1]
     if (last && last.role === 'assistant' && !last.content) {
       last.content = '❌ **请求异常**：未能与服务器建立连接，请重试。'
     }
-    
+
     ElMessage.error('对话请求失败，请重试')
   }
 }
@@ -391,7 +359,10 @@ async function sendMessage() {
   border-left-color: #6366f1;
 }
 
-.session-icon { flex-shrink: 0; font-size: 14px; }
+.session-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+}
 
 .session-title {
   flex: 1;
@@ -418,7 +389,9 @@ async function sendMessage() {
   gap: 16px;
 }
 
-.no-session-icon { font-size: 48px; }
+.no-session-icon {
+  font-size: 48px;
+}
 
 /* ── 消息列表 ── */
 .message-list {
@@ -436,10 +409,22 @@ async function sendMessage() {
   margin-top: 80px;
 }
 
-.empty-icon { font-size: 48px; margin-bottom: 12px; }
-.message-item { display: flex; }
-.message-item.user { justify-content: flex-end; }
-.message-item.assistant { justify-content: flex-start; }
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.message-item {
+  display: flex;
+}
+
+.message-item.user {
+  justify-content: flex-end;
+}
+
+.message-item.assistant {
+  justify-content: flex-start;
+}
 
 /* 对话气泡与操作栏的列布局包裹 */
 .message-content-wrapper {
@@ -505,10 +490,25 @@ async function sendMessage() {
   gap: 8px;
 }
 
-.input-controls { display: flex; align-items: center; }
-.input-row { display: flex; gap: 12px; align-items: flex-end; }
-.chat-input { flex: 1; }
-.send-btn { height: 40px; min-width: 80px; }
+.input-controls {
+  display: flex;
+  align-items: center;
+}
+
+.input-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.chat-input {
+  flex: 1;
+}
+
+.send-btn {
+  height: 40px;
+  min-width: 80px;
+}
 
 /* ── 动态打字效果 (Typing Indicator) ── */
 .typing-indicator {
@@ -536,10 +536,14 @@ async function sendMessage() {
 }
 
 @keyframes pulse {
-  0%, 80%, 100% {
+
+  0%,
+  80%,
+  100% {
     transform: scale(0.6);
     opacity: 0.4;
   }
+
   40% {
     transform: scale(1.2);
     opacity: 1;
@@ -550,6 +554,7 @@ async function sendMessage() {
 .bubble :deep(p) {
   margin: 0 0 10px 0;
 }
+
 .bubble :deep(p:last-child) {
   margin-bottom: 0;
 }
@@ -565,9 +570,19 @@ async function sendMessage() {
   font-weight: 600;
 }
 
-.bubble :deep(h1) { font-size: 1.5em; border-bottom: 1px solid #334155; padding-bottom: 4px; }
-.bubble :deep(h2) { font-size: 1.3em; }
-.bubble :deep(h3) { font-size: 1.15em; }
+.bubble :deep(h1) {
+  font-size: 1.5em;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 4px;
+}
+
+.bubble :deep(h2) {
+  font-size: 1.3em;
+}
+
+.bubble :deep(h3) {
+  font-size: 1.15em;
+}
 
 /* 工具调用块 (Blockquote) 设计样式 */
 .bubble :deep(blockquote) {
@@ -582,9 +597,11 @@ async function sendMessage() {
 .bubble :deep(blockquote p) {
   margin-bottom: 6px;
 }
+
 .bubble :deep(blockquote p:last-child) {
   margin-bottom: 0;
 }
+
 .bubble :deep(blockquote strong) {
   color: #e2e8f0;
 }
@@ -672,6 +689,7 @@ async function sendMessage() {
   margin: 0 0 10px 0;
   padding-left: 20px;
 }
+
 .bubble :deep(li) {
   margin-bottom: 4px;
 }
@@ -794,5 +812,3 @@ async function sendMessage() {
   background: #050b18 !important;
 }
 </style>
-
-
