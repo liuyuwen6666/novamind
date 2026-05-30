@@ -73,7 +73,7 @@ class WeatherTool(BaseTool):
     name = "get_weather"
     description = (
         "获取指定城市的实时天气和未来天气预报信息。"
-        "可获取温度、体感温度、湿度、风力风向、天气状况、AQI 空气质量、7天预报等。"
+        "包含当前温度、天气状况、未来几天的天气预报（forecasts）以及未来 24 小时的逐小时预报（forecast_hours）。"
     )
     parameters = {
         "type": "object",
@@ -84,15 +84,15 @@ class WeatherTool(BaseTool):
             },
             "data_type": {
                 "type": "string",
-                "description": "查询类型：all(全部)、now(实时)、forecast(预报)、hour(小时预报)、alert(预警)、index(生活指数)，默认 all",
-                "enum": ["all", "now", "forecast", "hour", "alert", "index"],
-                "default": "all",
+                "description": "查询类型，固定为 now 即可",
+                "enum": ["now"],
+                "default": "now",
             },
         },
         "required": ["city"],
     }
 
-    async def execute(self, city: str, data_type: str = "all") -> dict:
+    async def execute(self, city: str, data_type: str = "now") -> dict:
         logger.info("WeatherTool called: city=%s, data_type=%s", city, data_type)
 
         # Step 1: 查 district_id
@@ -115,11 +115,12 @@ class WeatherTool(BaseTool):
 
         try:
             async with httpx.AsyncClient(timeout=15) as client:
+                # 总是请求 data_type="all" 以确保获取全部的实时天气、未来天气预报（forecasts） and 未来小时预报（forecast_hours）
                 resp = await client.get(
                     "https://api.map.baidu.com/weather/v1/",
                     params={
                         "district_id": district_id,
-                        "data_type": data_type,
+                        "data_type": "all",
                         "ak": ak,
                     },
                 )
@@ -136,6 +137,7 @@ class WeatherTool(BaseTool):
             location = result.get("location", {})
             now = result.get("now", {})
             forecasts = result.get("forecasts", [])
+            forecast_hours = result.get("forecast_hours", [])
             alerts = result.get("alerts", [])
             indexes = result.get("indexes", [])
 
@@ -149,6 +151,7 @@ class WeatherTool(BaseTool):
                 },
                 "now": None,
                 "forecasts": [],
+                "forecast_hours": [],
                 "alerts": [],
                 "life_indexes": []
             }
@@ -176,10 +179,25 @@ class WeatherTool(BaseTool):
                         "weather_day": f.get("text_day"),
                         "weather_night": f.get("text_night"),
                         "wind_day": f.get("wd_day"),
-                        "wind_night": f.get("wd_night"),
+                        "wind_night": f.get("wind_night"),
                         "aqi": f.get("aqi"),
                     }
                     for f in forecasts
+                ]
+
+            if forecast_hours:
+                output["forecast_hours"] = [
+                    {
+                        "time": fh.get("data_time"),
+                        "temperature": fh.get("temp_fc"),
+                        "weather": fh.get("text"),
+                        "humidity": fh.get("rh"),
+                        "wind_class": fh.get("wind_class"),
+                        "wind_dir": fh.get("wind_dir"),
+                        "precipitation_1h": fh.get("prec_1h"),
+                        "clouds": fh.get("clouds"),
+                    }
+                    for fh in forecast_hours
                 ]
 
             if alerts:
