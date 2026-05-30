@@ -1,9 +1,17 @@
+import os
 import sys
-sys.path.insert(0, "e:/ai_study/06 NovaMind/backend")
+
+# 获取当前脚本所在目录并计算项目根目录及 backend 路径
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
+BACKEND_DIR = os.path.join(PROJECT_ROOT, "backend")
+
+sys.path.insert(0, BACKEND_DIR)
+sys.path.insert(0, PROJECT_ROOT)
 
 import asyncio
 import json
-from app.tools.weather_tool import WeatherTool
+from backend.app.tools.weather_tool import WeatherTool
 
 async def main():
     tool = WeatherTool()
