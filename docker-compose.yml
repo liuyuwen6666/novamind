@@ -16,6 +16,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-novamind123}
       POSTGRES_DB: ${POSTGRES_DB:-novamind}
+      TZ: Asia/Shanghai
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -40,6 +41,7 @@ services:
     environment:
       # 覆盖数据库连接（使用 Docker 内部网络主机名）
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-novamind123}@postgres:5432/${POSTGRES_DB:-novamind}
+      TZ: Asia/Shanghai
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -62,6 +64,8 @@ services:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
     container_name: novamind_frontend
     restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:

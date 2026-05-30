@@ -17,6 +17,7 @@ from app.services.llm_service import LLMService
 from app.tools.registry import tool_registry
 from app.tools.weather_tool import WeatherTool
 from app.tools.geocode_tool import GeocodeQueryTool
+from app.tools.datetime_tool import DateTimeTool
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 # 注册 Tools
 tool_registry.register(WeatherTool())
 tool_registry.register(GeocodeQueryTool())
+tool_registry.register(DateTimeTool())
 
 
 @router.post("/", summary="AI 对话（支持 RAG + Tool Calling + Streaming）")

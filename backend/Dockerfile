@@ -12,7 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     curl \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
+
+ENV TZ=Asia/Shanghai
 
 # 先复制依赖文件，利用 Docker 层缓存
 COPY requirements.txt .

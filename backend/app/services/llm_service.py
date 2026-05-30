@@ -141,6 +141,14 @@ class LLMService:
         if not choices:
             return None
         delta = choices[0].get("message", {})
+        
+        # 补全 tool_calls 的 index 字段，确保上层解析多工具调用时不发生错乱
+        tool_calls = delta.get("tool_calls")
+        if tool_calls and isinstance(tool_calls, list):
+            for idx, tc in enumerate(tool_calls):
+                if "index" not in tc:
+                    tc["index"] = idx
+
         return json.dumps({
             "choices": [{
                 "delta": delta,

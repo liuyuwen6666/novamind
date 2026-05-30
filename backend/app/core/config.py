@@ -30,6 +30,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # ── App ──────────────────────────────────────────────
@@ -83,7 +84,11 @@ class Settings(BaseSettings):
 
     @property
     def supports_tool_calling(self) -> bool:
-        return self.provider in (LLMProvider.OPENAI_COMPATIBLE, LLMProvider.LONGCAT)
+        return self.provider in (
+            LLMProvider.OPENAI_COMPATIBLE,
+            LLMProvider.LONGCAT,
+            LLMProvider.TENCENT_HUNYUAN,
+        )
 
     @property
     def supports_streaming(self) -> bool:
