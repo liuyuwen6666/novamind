@@ -8,7 +8,9 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # 安装系统依赖（PyMuPDF 需要 libmupdf）
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# 替换 Debian 12 默认源为阿里云镜像以加速 apt-get install
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     curl \

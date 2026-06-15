@@ -31,8 +31,8 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# 安装 serve（轻量静态文件服务器，替代 nginx）
-RUN npm install -g serve
+# 安装 serve（轻量静态文件服务器，替代 nginx），指定淘宝镜像源加速
+RUN npm config set registry https://registry.npmmirror.com && npm install -g serve
 
 # 从 builder 阶段复制构建产物
 COPY --from=builder /app/dist ./dist
