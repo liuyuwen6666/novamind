@@ -8,6 +8,7 @@ version: "3.9"
 
 services:
   # ── PostgreSQL + pgvector ────────────────────────────────
+  #   外部访问：可通过 服务器IP:5432 直连（需在本节 volumes 下挂载了 entrypoint 脚本）
   postgres:
     image: pgvector/pgvector:pg16
     container_name: novamind_postgres
@@ -21,6 +22,10 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # 外部访问 entrypoint 包装脚本（在 pg_hba.conf 中添加 0.0.0.0/0 md5 规则）
+      - ./postgres/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    command: ["postgres"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
