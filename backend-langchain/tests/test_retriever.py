@@ -91,3 +91,5 @@ async def test_sqlmodel_retriever():
         # 清理表
         async with engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.drop_all)
+        # 显式释放引擎连接池以避开 Windows 异步 Proactor 循环已关闭的 AttributeError
+        await engine.dispose()

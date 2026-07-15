@@ -69,3 +69,5 @@ async def test_db_session_and_model():
         # 清理表
         async with engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.drop_all)
+        # 显式释放数据库引擎连接池，防止异步事件循环过早退出导致套接字抛出 AttributeError
+        await engine.dispose()
